@@ -11,11 +11,57 @@
 
 
 
-WriteXLS <- function(x, ExcelFileName = "R.xls", perl = "perl", verbose = FALSE)
+WriteXLS <- function(x, ExcelFileName = "R.xls", SheetNames = NULL, perl = "perl", verbose = FALSE, envir = parent.frame())
 {
   # Check to be sure that each 'x' is a data frame
-  if (!all(sapply(x, function(i) is.data.frame(get(as.character(i))))))
+  if (!all(sapply(x, function(i) is.data.frame(get(as.character(i), envir = envir)))))
     stop("One or more of the objects named in 'x' is not a data frame or does not exist")
+
+  # Check to see if SheetNames is specified and if so:
+  #  check for duplications
+  #  they are same length as the number of dataframes
+  #  check to see if any SheetNames are >31 chars, which is the Excel Limit
+  #  check for invalid characters: []:*?/\
+  # ELSE
+  #  check to see if first 31 characters of data frame names are unique
+  if (!is.null(SheetNames))
+  {
+    if (any(duplicated(SheetNames)))
+    {  
+      message("At least one entry in 'SheetNames' is duplicated. Excel worksheets must have unique names.")
+      return(invisible(FALSE))
+    }
+     
+    if (length(x) != length(SheetNames))
+    {  
+      message("The number of 'SheetNames' does not equal the number of data frames in 'x'")
+      return(invisible(FALSE))
+    }
+
+    if (any(nchar(SheetNames) > 31))
+    {
+      message("At least one of 'SheetNames' is > 31 characters, which is the Excel limit")
+      return(invisible(FALSE))
+    }
+
+    if (any(grep("\\[|\\]|\\*|\\?|:|/|\\\\", SheetNames)))
+    {  
+      message("Invalid characters found in at least one entry in 'SheetNames'. Invalid characters are: []:*?/\\")
+      return(invisible(FALSE))
+    }
+  } else {
+    if (any(duplicated(substr(x, 1, 31))))
+    {
+      message("At least one data frame entry in 'x' is duplicated up to the first 31 characters. Excel worksheets must have unique names.")
+      return(invisible(FALSE))
+    }
+
+    if (any(grep("\\[|\\]|\\*|\\?|:|/|\\\\", x)))
+    {  
+      message("Invalid characters found in at least one data frame entry in 'x'. Invalid characters are: []:*?/\\")
+      return(invisible(FALSE))
+    }  
+  }
   
   # Get path to WriteXLS.pl
   Perl.Path <- file.path(.path.package("WriteXLS"), "Perl")
@@ -57,20 +103,37 @@ WriteXLS <- function(x, ExcelFileName = "R.xls", perl = "perl", verbose = FALSE)
     if (verbose)
       cat("Creating CSV File: ", i, "\n")
    
-    write.table(get(i), file = paste(Tmp.Dir, "/", i, ".csv", sep = ""),
+    write.table(get(i, envir = envir), file = paste(Tmp.Dir, "/", i, ".csv", sep = ""),
                 sep = ",", quote = TRUE, na = "", row.names = FALSE)
+  }
+
+  if (!is.null(SheetNames))
+  {
+    if (verbose)
+      cat("Creating SheetNames.txt\n")
+    
+    write(as.matrix(SheetNames), file = paste(Tmp.Dir, "/SheetNames.txt", sep = ""))
+    SN <- TRUE
+  } else {
+    SN <- FALSE
   }
 
   if (verbose)
     cat("\n")
 
   # Call Perl script
-  cmd <- paste(perl, " -I", Perl.Path, " ", Fn.Path, " --CSVPath ", Tmp.Dir, " --verbose ", verbose, " ", ExcelFileName, sep = "")
+  cmd <- paste(perl, " -I", Perl.Path, " ", Fn.Path, " --CSVPath ", Tmp.Dir, " --verbose ", verbose, " --SN ", SN, " ", ExcelFileName, sep = "")
 
   # Call the external Perl script and get the result of the call
   Result <- system(cmd)
 
   # Check to see if Result != 0 in the case of the failure of the Perl script
   # This should also raise an error for R CMD check for package testing on R-Forge and CRAN
-  if (Result != 0) stop("The Perl script 'WriteXLS.pl' failed to run successfully.")
+  if (Result != 0)
+  {
+    message("The Perl script 'WriteXLS.pl' failed to run successfully.")
+    return(invisible(FALSE))
+  } else {
+    return(invisible(TRUE))
+  }
 }
