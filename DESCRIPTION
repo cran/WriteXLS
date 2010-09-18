@@ -1,6 +1,6 @@
 Package: WriteXLS
-Version: 2.0.1
-Date: 2010-09-15
+Version: 2.1.0
+Date: 2010-09-18
 Title: Cross-platform Perl based R function to create Excel 2003 (XLS)
         files
 Description: Cross-platform Perl based R function to create Excel 2003
@@ -13,6 +13,6 @@ Maintainer: Marc Schwartz <marc_schwartz@me.com>
 License: GPL (>= 2)
 SystemRequirements: Perl, Encode, Text::CSV_XS
 URL: http://r-forge.r-project.org/projects/writexls/
-Packaged: 2010-09-16 17:44:15 UTC; marcschwartz
+Packaged: 2010-09-18 20:33:21 UTC; marcschwartz
 Repository: CRAN
-Date/Publication: 2010-09-16 18:40:40
+Date/Publication: 2010-09-19 18:30:07
