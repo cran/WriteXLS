@@ -6,7 +6,7 @@
 #
 # Write to an Excel binary file.
 #
-# Copyright 2012, Marc Schwartz <marc_schwartz@me.com>
+# Copyright 2013, Marc Schwartz <marc_schwartz@me.com>
 #
 # This software is distributed under the terms of the GNU General
 # Public License Version 2, June 1991.  
@@ -35,7 +35,7 @@ use strict;
 use Spreadsheet::WriteExcel;
 use Getopt::Long;
 use File::Basename;
-use Text::CSV_XS;
+use Text::CSV_PP;
 use Encode;
 
 
@@ -224,7 +224,7 @@ foreach my $FileName (@FileNames) {
   }
 
   # Open CSV File
-  my $csv = Text::CSV_XS->new ({ binary => 1 });
+  my $csv = Text::CSV_PP->new ({ binary => 1 });
   open (CSVFILE, "$FileName") || die "ERROR: cannot open $FileName. $!\n";
 
   # Create new sheet with filename prefix
@@ -257,6 +257,8 @@ foreach my $FileName (@FileNames) {
     $WorkSheet->set_row(0, undef, $bold);
   }
 
+  my $CommentRow = 0;
+
   # Write to Sheet
   while (<CSVFILE>) {
 
@@ -265,17 +267,44 @@ foreach my $FileName (@FileNames) {
 
       $Column = 0;
 
-      foreach my $Fld (@Fields) {
-	if ($Encoding eq "UTF-8") {
-          $WorkSheet->write($Row, $Column, decode_utf8($Fld));
-        } else {
-          $WorkSheet->write($Row, $Column, decode("iso-8859-1", $Fld));
+      # The row with comments with be 0 if the column names are not 
+      # output in the CSV file, 1 otherwise.
+      if ($Row <= 1) {
+        if (index($Fields[0], "WRITEXLS COMMENT: ") != -1) {
+          $CommentRow = 1;
+
+          foreach my $Fld (@Fields) {
+            $Fld = substr $Fld, 18;
+            if ($Fld ne "") {
+              if ($Encoding eq "UTF-8") {
+                $WorkSheet->write_comment(0, $Column, decode_utf8($Fld));
+	      } else {
+                $WorkSheet->write_comment(0, $Column, decode_utf8("iso-8859-1", $Fld));
+              }
+            }
+
+            $Column++; 
+	  }
 	}
-        $Column++;
-     }
-    $Row++;
-   }
- }
+      }
+
+      if ($CommentRow != 1) {
+        foreach my $Fld (@Fields) {
+          if ($Encoding eq "UTF-8") {
+            $WorkSheet->write($Row, $Column, decode_utf8($Fld));
+          } else {
+            $WorkSheet->write($Row, $Column, decode_utf8("iso-8859-1", $Fld));
+	  }
+
+          $Column++;
+	}
+
+        $Row++;
+      }
+
+      $CommentRow = 0;
+    }
+  }
 
   close CSVFILE;
 
@@ -285,10 +314,11 @@ foreach my $FileName (@FileNames) {
 
   if ($AutoFilter eq "TRUE") {
     $WorkSheet->autofilter(0, 0, $Row - 1, $Column - 1);
-    $BoldHeaderRow = "TRUE";
   }
 
-  $WorkSheet->freeze_panes($FreezeRow, $FreezeCol);
+  if (($FreezeRow != 0) && ($FreezeCol != 0)) {
+    $WorkSheet->freeze_panes($FreezeRow, $FreezeCol);
+  }
 }
 
 # Explicitly close the Excel file
