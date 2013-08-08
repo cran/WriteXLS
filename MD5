@@ -1,10 +1,10 @@
 eb723b61539feef013de476e68b5c50a *COPYING
-5c1a445080a3246a4ca484cb4e6a7a76 *DESCRIPTION
+b7f8256df8aef6697743453ea503b451 *DESCRIPTION
 b0272fd741058a699ffa8ea816b77de6 *INSTALL
 3a7915ea83b03ab0617bc4709f1871d8 *NAMESPACE
-eadd2768334452679a8604b803180daf *R/WriteXLS.R
+a7450ea05f4edfc5dd6f97ef4b143140 *R/WriteXLS.R
 ea60f6825d60e40b2b01f8fd928ccb0a *R/testPerl.R
-d65d62056bba2cbfba7a9d0022ccccc8 *README
+dee3d1269cbf7ef28fac137111cf10a5 *README
 b0272fd741058a699ffa8ea816b77de6 *inst/INSTALL
 013677fabc8a49480cca5c10d67dd850 *inst/Perl/Archive/Zip.pm
 da56a4326657fda95d0de93c65ed4006 *inst/Perl/Archive/Zip/Archive.pm
@@ -73,7 +73,7 @@ e8dd0f99100f55a0707b90564e8c6f54 *inst/Perl/Spreadsheet/WriteExcel/Workbook.pm
 9c422ddedc567c081b785a1b312b187f *inst/Perl/Spreadsheet/WriteExcel/Worksheet.pm
 aa750353c19b04375f4f3373db300fee *inst/Perl/Text/CSV.pm
 ac76df3040005b95ccbe2fa0f13f997b *inst/Perl/Text/CSV_PP.pm
-d2766abfcba79741df105cdceb324b02 *inst/Perl/WriteXLS.pl
-571be8d94cfb52eb5b01ab2664d53158 *inst/Perl/WriteXLSX.pl
-b3b87e4399e8ea3bbbf1dab7730757dd *man/WriteXLS.Rd
+bb9fdf9ecf110ef2354174e8eecd6440 *inst/Perl/WriteXLS.pl
+088b972a5d8dd2da724f6902201e2be5 *inst/Perl/WriteXLSX.pl
+07c4fe67d39c2c89f8a47687b4a77789 *man/WriteXLS.Rd
 2135e7f8e8b9c29381b5689d61851f71 *man/testPerl.Rd
