@@ -1,5 +1,5 @@
 eb723b61539feef013de476e68b5c50a *COPYING
-f8b3bbf495ac05aca68d96293471e65f *DESCRIPTION
+4124cd7923c1596f912e5dce81263591 *DESCRIPTION
 b0272fd741058a699ffa8ea816b77de6 *INSTALL
 3a7915ea83b03ab0617bc4709f1871d8 *NAMESPACE
 2743aa2c4d97cfee66dc138d06ecce8a *R/WriteXLS.R
@@ -73,7 +73,7 @@ e8dd0f99100f55a0707b90564e8c6f54 *inst/Perl/Spreadsheet/WriteExcel/Workbook.pm
 9c422ddedc567c081b785a1b312b187f *inst/Perl/Spreadsheet/WriteExcel/Worksheet.pm
 aa750353c19b04375f4f3373db300fee *inst/Perl/Text/CSV.pm
 ac76df3040005b95ccbe2fa0f13f997b *inst/Perl/Text/CSV_PP.pm
-bb9fdf9ecf110ef2354174e8eecd6440 *inst/Perl/WriteXLS.pl
-088b972a5d8dd2da724f6902201e2be5 *inst/Perl/WriteXLSX.pl
-07c4fe67d39c2c89f8a47687b4a77789 *man/WriteXLS.Rd
+4d26fd96f1918dbd33065ae740660aaf *inst/Perl/WriteXLS.pl
+6106b7cf8ff6c8477e7da23dbc9239f0 *inst/Perl/WriteXLSX.pl
+0da4a732bd69b9569d611ed663c9a445 *man/WriteXLS.Rd
 2135e7f8e8b9c29381b5689d61851f71 *man/testPerl.Rd
