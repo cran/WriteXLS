@@ -4,7 +4,7 @@
 ##
 ## Write R data frames to an Excel binary file using a Perl script
 ##
-## Copyright 2015, Marc Schwartz <marc_schwartz@me.com>
+## Copyright 2015-2019, Marc Schwartz <marc_schwartz@me.com>
 ##
 ## This software is distributed under the terms of the GNU General
 ## Public License Version 2, June 1991.  
@@ -74,7 +74,6 @@ WriteXLS <- function(x, ExcelFileName = "R.xls", SheetNames = NULL, perl = "perl
   if (!all(sapply(DF.LIST, is.data.frame)))
     stop("One or more of the objects named in 'x' is not a data frame or does not exist")
 
-  
   if (XLSX) {
     ## Additional checks for Excel 2007 limitations
     ## 16,384 columns, including rownames, if included
@@ -132,6 +131,13 @@ WriteXLS <- function(x, ExcelFileName = "R.xls", SheetNames = NULL, perl = "perl
       return(invisible(FALSE))
     }  
   }
+
+  ## Function to escape any embedded double quote characters
+  ## in a field before writing to the CSV files. With the
+  ## change to writeLines() from write.table(), this is no longer done.
+  escQuote <- function(x) {
+    gsub("\"", "\\\\\"", x)
+  }
   
   ## Get path to WriteXLS.pl or WriteXLSX.pl
   Perl.Path <- system.file("Perl", package = "WriteXLS")
@@ -182,48 +188,56 @@ WriteXLS <- function(x, ExcelFileName = "R.xls", SheetNames = NULL, perl = "perl
                        function(x) ifelse(is.null(attr(x, "comment")),
                                           "",
                                           attr(x, "comment")))
-
-    ## Need to convert all columns in DF.LIST[[i]] to character
-    ## to allow for rbinding of COMMENTS, since columns may be of various types.
-    ## Everything is going to be output via write.table() as character anyway.
-    ## Preserve the rownames from the original DF.LIST, lest they get
-    ## re-named to numbers by default.
-    ## Set 'optional = TRUE' so that make.names() is not used on non-syntactially
-    ## correct column names.
-    DF.LIST[[i]] <- as.data.frame(lapply(DF.LIST[[i]], as.character),
-                                  stringsAsFactors = FALSE, optional = TRUE,
-                                  row.names = rownames(DF.LIST[[i]]))
         
     ## Pre-pend "WRITEXLS COMMENT:" to each comment so that we can differentiate
     ## the comment row from column names, which may or may not be written
     ## out depending upon 'col.names' argument
     COMMENTS <- paste("WRITEXLS COMMENT:", COMMENTS)
 
-    ## rbind() COMMENTS to the data frame as the first row
-    ## This  may result in a renaming of the DF.LIST[[i]]
-    ## rownames after rbind()ing which will get picked up in the Excel
-    ## file if row.names = TRUE. (eg. What was row '1' will then be row '2').
-    ## Get rownames from DF.LIST[[i]] and reset after rbind()ing.
-    ## Set the rowname for the COMMENTS row also, so that if row.names = TRUE,
-    ## the rownames will get dumped by write.table() below and the 
-    ## the first row gets picked up as the comments row in the Perl code.
-    ## The Perl code only checks the first parsed field in the CSV file row and
-    ## the rownames will be the first column in each row.
-    ## Also need to handle a 0 row DF.LIST[[i]], as some want to be able
-    ## to write out a 0 row data frame to the Excel file. If 0 rows, need to
-    ## reset the colnames for DF.LIST[[i]] to the original, as they would be
-    ## lost after the rbind(). This will result in the column names only being
-    ## written to the worksheet, if col.names = TRUE
-    RowNames <- c("WRITEXLS COMMENT: ", rownames(DF.LIST[[i]]))
-    ColNames <- colnames(DF.LIST[[i]])
-    DF.LIST[[i]] <- rbind(COMMENTS, DF.LIST[[i]])
-    rownames(DF.LIST[[i]]) <- RowNames
-    colnames(DF.LIST[[i]]) <- ColNames
+    ## Prepare the data frame data for export
     
-    ## Write out the data frame to the CSV file
-    write.table(DF.LIST[[i]], file = paste(Tmp.Dir, "/", i, ".csv", sep = ""),
-                sep = ",", quote = TRUE, na = na, row.names = row.names,
-                col.names = ifelse(row.names && col.names, NA, col.names))
+    ## Need to convert all columns in DF.LIST[[i]] to character
+    ## Everything is going to be output via writeLines() as character anyway.
+    ## Preserve the rownames from the original DF.LIST, lest they get
+    ## re-named to numbers by default.
+    ## Set 'optional = TRUE' so that make.names() is not used on non-syntactially
+    ## correct column names.
+    ROWNAMES <- rownames(DF.LIST[[i]])
+    COLNAMES <- colnames(DF.LIST[[i]])
+    DF.LIST[[i]] <- data.frame(lapply(DF.LIST[[i]], as.character),
+                               stringsAsFactors = FALSE, check.names = FALSE)
+    rownames(DF.LIST[[i]]) <- ROWNAMES
+    colnames(DF.LIST[[i]]) <- COLNAMES
+    
+    ## First, replace NAs as indicated by 'na' argument
+    NA.IND <- which(is.na(DF.LIST[[i]]), arr.ind = TRUE)
+    if (nrow(NA.IND) > 0) {
+      DF.LIST[[i]][NA.IND] <- na
+    }
+    
+    ## Add row names to DF and a blank column name if row.names = TRUE
+    if (row.names) {
+      DF.LIST[[i]] <- cbind(rownames(DF.LIST[[i]]), DF.LIST[[i]])
+      colnames(DF.LIST[[i]]) <- c("", COLNAMES)
+      COMMENTS <- c("WRITEXLS COMMENT: ", COMMENTS)
+    }
+    
+    ## paste() together each row in preparation for line by line output using writeLines()
+    DF.Data <- apply(DF.LIST[[i]], 1, function(x) {paste('"', escQuote(x), '"', sep = "", collapse = ",")})
+
+    ## paste() together the COMMENTS row
+    COMMENTS <- paste('"', escQuote(COMMENTS), '"', sep = "", collapse = ",")
+
+    ## Output to file using writeLines() with useBytes = TRUE to preserve encodings
+    if (col.names) {
+      ## paste() together the column names for output
+      Cols.Out <- paste('"', escQuote(colnames(DF.LIST[[i]])), '"', sep = "", collapse = ",")
+      Lines.Out <- c(Cols.Out, COMMENTS, DF.Data)
+    } else {
+      Lines.Out <- c(COMMENTS, DF.Data)
+    }
+
+    writeLines(Lines.Out, con = paste(Tmp.Dir, "/", i, ".csv", sep = ""), useBytes = TRUE)
   }
 
   ## Write 'x' (character vector of data frame names) to file
