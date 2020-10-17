@@ -6,23 +6,25 @@
 #
 # Write to an Excel binary file.
 #
-# Copyright 2015-2019, Marc Schwartz <marc_schwartz@me.com>
+# Copyright 2015-2020, Marc Schwartz <marc_schwartz@me.com>
 #
 # This software is distributed under the terms of the GNU General
 # Public License Version 2, June 1991.  
 
 
-# Called as: WriteXLS.pl [--CSVpath] [--verbose] [--Encoding] [--AdjWidth] [--AutoFilter] [--BoldHeaderRow] ExcelFileName
+# Called as: WriteXLS.pl [--CSVpath] [--verbose] [--AdjWidth] [--AutoFilter] [--BoldHeaderRow] [-FreezeRow] [--FreezeCol] [--Encoding] [--AllText] ExcelFileName
 
 # CSVpath = Path to CSV Files. Defaults to '.'
 # verbose = Output status messages. TRUE or FALSE. Defaults to FALSE
-# adj.width = Adjust column widths based upon longest entry in each column. Defaults to FALSE
-# autofilter = Set autofilter for each sheet. Defaults to FALSE
-# bold.header.row = Set bold font for header row. Defaults to FALSE
+# Adj.Width = Adjust column widths based upon longest entry in each column. Defaults to FALSE
+# AutoFilter = Set autofilter for each sheet. Defaults to FALSE
+# Bold.Header.Row = Set bold font for header row. Defaults to FALSE
+# FreezeRow = Set row to freeze for scrolling
+# FreezeCol = Set col to freeze for scrolling
 # Encoding = character encoding. Either "UTF-8" (default) or "latin1" (aka "iso-8859-1") or "cp1252" (Windows)
 
 # Spreadsheet::WriteExcel 
-# http://search.cpan.org/~jmcnamara/Spreadsheet-WriteExcel/lib/Spreadsheet/WriteExcel.pm
+# https://github.com/jmcnamara/spreadsheet-writeexcel
 
 # For unicode issues:
 # http://www.ahinea.com/en/tech/perl-unicode-struggle.html
@@ -47,18 +49,20 @@ my $verbose = "FALSE";
 my $AdjWidth = "FALSE";
 my $AutoFilter = "FALSE";
 my $BoldHeaderRow = "FALSE";
-my $Encoding = "UTF-8";
 my $FreezeRow = 0;
 my $FreezeCol = 0;
+my $Encoding = "UTF-8";
+my $AllText = "FALSE";
 
 GetOptions ('CSVpath=s' => \$CSVPath, 
             'verbose=s' => \$verbose,
             'AdjWidth=s' => \$AdjWidth,
             'AutoFilter=s' => \$AutoFilter,
             'BoldHeaderRow=s' => \$BoldHeaderRow,
-            'Encoding=s' => \$Encoding,
             'FreezeRow=i' => \$FreezeRow,
-            'FreezeCol=i' => \$FreezeCol);
+            'FreezeCol=i' => \$FreezeCol,
+	    'Encoding=s' => \$Encoding,
+	    'AllText=s' => \$AllText);
 
 my $ExcelFileName = $ARGV[0];
 
@@ -130,7 +134,7 @@ chomp(@FileNames);
 # if AdjWidth, add a write handler to store the column string widths to enable 
 # adjustments
 # Based upon code from:
-# http://search.cpan.org/dist/Spreadsheet-WriteExcel/lib/Spreadsheet/WriteExcel/Examples.pm#Example:_autofit.pl
+# https://github.com/jmcnamara/spreadsheet-writeexcel/blob/master/examples/autofit.pl
 # Not using full code base, since we are not formatting using fancy fonts, etc. and it requires yet another external module
 # So this will be an approximation
 
@@ -177,7 +181,8 @@ sub store_string_widths {
     return if $token =~ /^=/;           # Ignore formula
 
     # Ignore numbers
-    return if $token =~ /^([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?$/;
+    # Comment so that numbers are included, to deal with leading/trailing zeros
+    # return if $token =~ /^([+-]?)(?=\d|\.\d)\d*(\.\d*)?([Ee]([+-]?\d+))?$/;
 
     # Ignore various internal and external hyperlinks. In a real scenario
     # you may wish to track the length of the optional strings used with
@@ -222,6 +227,37 @@ sub string_width {
 
 
 ###############################################################################
+# 
+# Use write_string(), rather than write() if $AllText is TRUE
+# 
+
+sub use_write_string {
+  
+  my $worksheet = shift;
+  my $token     = $_[2];
+
+  # use this all the time
+  if ($AllText eq "TRUE") {
+    return $worksheet->write_string( @_ );
+  # exception where trailing zeroes preceded
+  # by non-zero digits only, as an integer
+  # Return control to write();  
+  } elsif ($token =~ /^[1-9]+0+$/) {
+    return undef;
+  # for leading/trailing zeroes
+  # where the leading zero is not followed by a decimal  
+  } elsif ($token =~ /^0[^\.]|0$/) {
+    return $worksheet->write_string( @_ );
+  # else return control to write();  
+  } else {
+    return undef;
+  }
+}
+
+
+
+
+###############################################################################
 #
 # Write out each worksheet to file
 #
@@ -229,13 +265,13 @@ sub string_width {
 foreach my $FileName (@FileNames) {
 
   if ($verbose eq "TRUE") {
-    print "Reading: $FileName\n";
+    print "\n\nReading: $FileName\n";
   }
 
   # Open CSV File
-  my $csv = Text::CSV_PP->new ({ binary => 1, allow_loose_quotes => 1, escape_char => "\\"});
-  open (CSVFILE, $Encode, "$FileName") || die "ERROR: cannot open $FileName. $!\n";
-
+  my $csv = Text::CSV_PP->new ({ binary => 1, strict => 1});
+  open my $CSVFILE, $Encode, $FileName or die "ERROR: cannot open $FileName. $!\n";
+  
   # Create new sheet with filename prefix
   # ($base, $dir, $ext) = fileparse ($FileName, '..*');
   my $FName = (fileparse ($FileName, '\..*'))[0];
@@ -252,7 +288,8 @@ foreach my $FileName (@FileNames) {
 
   # enable sheetwide retention of leading zeros
   # to handle entries such as numeric-like codes
-  $WorkSheet->keep_leading_zeros();
+  # supercede with use_write_string above
+  # $WorkSheet->keep_leading_zeros();
 
   # adjust column widths?
   # add a write handler to store the column string widths
@@ -261,6 +298,10 @@ foreach my $FileName (@FileNames) {
   if ($AdjWidth eq "TRUE") {
     $WorkSheet->add_write_handler(qr[\w], \&store_string_widths); 
   }
+
+  # Add a write handler to force writing selected
+  # content using write_string() instead of write()
+  $WorkSheet->add_write_handler(qr[\w], \&use_write_string); 
 
   # Rows and columns are zero indexed
   $Row = 0;
@@ -272,46 +313,51 @@ foreach my $FileName (@FileNames) {
 
   my $CommentRow = 0;
 
-  # Write to Sheet
-  while (<CSVFILE>) {
+  while (my $line = $csv->getline($CSVFILE)) {
 
-    if ($csv->parse($_)) {
-      my @Fields = $csv->fields();
+    my @Fields = @$line;
 
-      $Column = 0;
+    ## Enable the output of the CSV line number
+    ## if an error is triggered when parsing the line
+    ## Typically due to an inconsistent number of fields
+    if ($verbose eq "TRUE") {
+      print "Parsing CSV File Row: $Row\n";
+    }
+ 
+    $Column = 0;
 
-      # The row with comments will be 0 if the column names are not 
-      # output in the CSV file, 1 otherwise.
-      if ($Row <= 1) {
-        if (index($Fields[0], "WRITEXLS COMMENT: ") != -1) {
-          $CommentRow = 1;
+    # The row with comments will be 0 if the column names are not 
+    # output in the CSV file, 1 otherwise.
+    if ($Row <= 1) {
+      if (index($Fields[0], "WRITEXLS COMMENT: ") != -1) {
+        $CommentRow = 1;
 
-          foreach my $Fld (@Fields) {
-            $Fld = substr $Fld, 18;
-            if ($Fld ne "") {
-                $WorkSheet->write_comment(0, $Column, $Fld);
-           }
-
-            $Column++; 
-	  }
-	}
-      }
-
-      if ($CommentRow != 1) {
         foreach my $Fld (@Fields) {
-          $WorkSheet->write($Row, $Column, $Fld);
+          $Fld = substr $Fld, 18;
+          if ($Fld ne "") {
+              $WorkSheet->write_comment(0, $Column, $Fld);
+         }
 
-	$Column++;
+          $Column++; 
         }
+      }
+    }
+
+    if ($CommentRow != 1) {
+      foreach my $Fld (@Fields) {
+        $WorkSheet->write($Row, $Column, $Fld);
+
+        $Column++;
+      }
 
       $Row++;
-      }
-
-      $CommentRow = 0;
     }
+
+    $CommentRow = 0;
+    
   }
 
-  close CSVFILE;
+  close $CSVFILE;
 
   if ($AdjWidth eq "TRUE") {
     autofit_columns($WorkSheet);

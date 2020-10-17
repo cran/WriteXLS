@@ -4,7 +4,7 @@
 ##
 ## Write R data frames to an Excel binary file using a Perl script
 ##
-## Copyright 2015-2019, Marc Schwartz <marc_schwartz@me.com>
+## Copyright 2015-2020, Marc Schwartz <marc_schwartz@me.com>
 ##
 ## This software is distributed under the terms of the GNU General
 ## Public License Version 2, June 1991.  
@@ -19,7 +19,8 @@
 
 
 WriteXLS <- function(x, ExcelFileName = "R.xls", SheetNames = NULL, perl = "perl", verbose = FALSE,
-                     Encoding = c("UTF-8", "latin1", "cp1252"), row.names = FALSE, col.names = TRUE,
+                     Encoding = c("UTF-8", "latin1", "cp1252"), AllText = FALSE,
+                     row.names = FALSE, col.names = TRUE,
                      AdjWidth = FALSE, AutoFilter = FALSE, BoldHeaderRow = FALSE,
                      na = "", FreezeRow = 0, FreezeCol = 0,
                      envir = parent.frame())
@@ -132,11 +133,10 @@ WriteXLS <- function(x, ExcelFileName = "R.xls", SheetNames = NULL, perl = "perl
     }  
   }
 
-  ## Function to escape any embedded double quote characters
-  ## in a field before writing to the CSV files. With the
-  ## change to writeLines() from write.table(), this is no longer done.
-  escQuote <- function(x) {
-    gsub("\"", "\\\\\"", x)
+  ## Function to double any embedded double quote characters
+  ## in a field before writing to the CSV files.
+  dblQuote <- function(x) {
+    gsub("\"", "\"\"", x)
   }
   
   ## Get path to WriteXLS.pl or WriteXLSX.pl
@@ -223,20 +223,20 @@ WriteXLS <- function(x, ExcelFileName = "R.xls", SheetNames = NULL, perl = "perl
     }
     
     ## paste() together each row in preparation for line by line output using writeLines()
-    DF.Data <- apply(DF.LIST[[i]], 1, function(x) {paste('"', escQuote(x), '"', sep = "", collapse = ",")})
+    DF.Data <- apply(DF.LIST[[i]], 1, function(x) {paste('"', dblQuote(x), '"', sep = "", collapse = ",")})
 
     ## paste() together the COMMENTS row
-    COMMENTS <- paste('"', escQuote(COMMENTS), '"', sep = "", collapse = ",")
+    COMMENTS <- paste('"', dblQuote(COMMENTS), '"', sep = "", collapse = ",")
 
     ## Output to file using writeLines() with useBytes = TRUE to preserve encodings
     if (col.names) {
       ## paste() together the column names for output
-      Cols.Out <- paste('"', escQuote(colnames(DF.LIST[[i]])), '"', sep = "", collapse = ",")
+      Cols.Out <- paste('"', dblQuote(colnames(DF.LIST[[i]])), '"', sep = "", collapse = ",")
       Lines.Out <- c(Cols.Out, COMMENTS, DF.Data)
     } else {
       Lines.Out <- c(COMMENTS, DF.Data)
     }
-
+    
     writeLines(Lines.Out, con = paste(Tmp.Dir, "/", i, ".csv", sep = ""), useBytes = TRUE)
   }
 
@@ -265,6 +265,7 @@ WriteXLS <- function(x, ExcelFileName = "R.xls", SheetNames = NULL, perl = "perl
                " --FreezeRow ", FreezeRow,
                " --FreezeCol ", FreezeCol,
                " --Encoding ", Encoding,
+               " --AllText ", AllText,
                " ", shQuote(ExcelFileName), sep = "")
 
   ## Call the external Perl script and get the result of the call
